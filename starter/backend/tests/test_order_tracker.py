@@ -65,3 +65,33 @@ def test_get_order_by_id_returns_none_if_not_found(order_tracker, mock_storage):
     result = order_tracker.get_order_by_id("NONEXISTENT")
 
     assert result is None
+
+def test_update_order_status_successfully(order_tracker, mock_storage):
+    """Tests changing an order's status from 'pending' to 'shipped'."""
+    mock_storage.get_order.return_value = {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "pending"
+    }
+
+    result = order_tracker.update_order_status("ORD001", "shipped")
+
+    assert result["status"] == "shipped"
+    mock_storage.save_order.assert_called_once_with("ORD001", {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "shipped"
+    })
+
+def test_update_order_status_raises_error_if_not_found(order_tracker, mock_storage):
+    """Tests that updating a non-existent order raises a ValueError."""
+    mock_storage.get_order.return_value = None
+
+    with pytest.raises(ValueError, match="Order with ID 'NONEXISTENT' does not exist."):
+        order_tracker.update_order_status("NONEXISTENT", "shipped")
+
+    mock_storage.save_order.assert_not_called()

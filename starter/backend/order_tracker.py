@@ -29,7 +29,13 @@ class OrderTracker:
         return self.storage.get_order(order_id)
 
     def update_order_status(self, order_id: str, new_status: str):
-        pass
+        order = self.get_order_by_id(order_id)
+        if not order:
+            raise ValueError(f"Order with ID '{order_id}' does not exist.")
+        order["status"] = new_status
+        self.storage.save_order(order_id, order)
+        return order
+
 
     def list_all_orders(self):
         pass
