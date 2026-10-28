@@ -40,4 +40,9 @@ class OrderTracker:
         return list(self.storage.get_all_orders().values())
 
     def list_orders_by_status(self, status: str):
-        pass
+        result = []
+        for order in self.list_all_orders():
+            if order["status"] == status:
+                result.append(order)
+        return result
+
