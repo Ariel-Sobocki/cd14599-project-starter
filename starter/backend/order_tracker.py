@@ -1,6 +1,13 @@
 # This module contains the OrderTracker class, which encapsulates the core
 # business logic for managing orders.
 
+VALID_STATUSES = ("pending", "processing", "shipped")
+
+
+class OrderNotFoundError(ValueError):
+    """Raised when an operation targets an order that does not exist."""
+
+
 class OrderTracker:
     """
     Manages customer orders, providing functionalities to add, update,
@@ -14,6 +21,7 @@ class OrderTracker:
         self.storage = storage
 
     def add_order(self, order_id: str, item_name: str, quantity: int, customer_id: str, status: str = "pending"):
+        self._validate_status(status)
         if self.storage.get_order(order_id):
             raise ValueError(f"Order with ID '{order_id}' already exists.")
         order = {
@@ -31,7 +39,8 @@ class OrderTracker:
     def update_order_status(self, order_id: str, new_status: str):
         order = self.get_order_by_id(order_id)
         if not order:
-            raise ValueError(f"Order with ID '{order_id}' does not exist.")
+            raise OrderNotFoundError(f"Order with ID '{order_id}' does not exist.")
+        self._validate_status(new_status)
         order["status"] = new_status
         self.storage.save_order(order_id, order)
         return order
@@ -46,3 +55,6 @@ class OrderTracker:
                 result.append(order)
         return result
 
+    def _validate_status(self, status: str):
+        if status not in VALID_STATUSES:
+            raise ValueError(f"Invalid status '{status}'. Valid statuses are: {', '.join(VALID_STATUSES)}.")

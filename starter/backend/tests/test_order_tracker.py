@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock
-from ..order_tracker import OrderTracker
+from ..order_tracker import OrderTracker, OrderNotFoundError
 
 # --- Fixtures for Unit Tests ---
 
@@ -136,3 +136,32 @@ def test_list_orders_by_status_returns_empty_list_if_no_match(order_tracker, moc
     result = order_tracker.list_orders_by_status("delivered")
 
     assert result == []
+
+def test_add_order_raises_error_if_status_invalid(order_tracker, mock_storage):
+    """Tests that adding an order with an unknown status raises a ValueError."""
+    with pytest.raises(ValueError, match="Invalid status 'lost'."):
+        order_tracker.add_order("ORD001", "Laptop", 1, "CUST001", "lost")
+
+    mock_storage.save_order.assert_not_called()
+
+def test_update_order_status_raises_error_if_status_invalid(order_tracker, mock_storage):
+    """Tests that updating to an unknown status raises a ValueError and does not save."""
+    mock_storage.get_order.return_value = {
+        "order_id": "ORD001",
+        "item_name": "Laptop",
+        "quantity": 1,
+        "customer_id": "CUST001",
+        "status": "pending"
+    }
+
+    with pytest.raises(ValueError, match="Invalid status 'lost'."):
+        order_tracker.update_order_status("ORD001", "lost")
+
+    mock_storage.save_order.assert_not_called()
+
+def test_update_order_status_raises_not_found_error_if_missing(order_tracker, mock_storage):
+    """Tests that a missing order raises OrderNotFoundError, distinct from an invalid status."""
+    mock_storage.get_order.return_value = None
+
+    with pytest.raises(OrderNotFoundError):
+        order_tracker.update_order_status("NONEXISTENT", "shipped")

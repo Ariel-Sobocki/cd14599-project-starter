@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
-from backend.order_tracker import OrderTracker
+from backend.order_tracker import OrderTracker, OrderNotFoundError
 from backend.in_memory_storage import InMemoryStorage
 
 app = Flask(__name__, static_folder='../frontend')
@@ -10,13 +10,25 @@ order_tracker = OrderTracker(in_memory_storage)
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
 
+def get_json_body(required_fields):
+    """Returns (data, None) if the body is a JSON object with all required fields, else (None, error response)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None, (jsonify({"error": "Request body must be a JSON object."}), 400)
+    missing = [field for field in required_fields if field not in data]
+    if missing:
+        return None, (jsonify({"error": f"Missing required field(s): {', '.join(missing)}."}), 400)
+    return data, None
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
 @app.route('/api/orders', methods=['POST'])
 def add_order_api():
-    data = request.get_json()
+    data, error = get_json_body(["order_id", "item_name", "quantity", "customer_id"])
+    if error:
+        return error
     try:
         order_tracker.add_order(
             data["order_id"],
@@ -38,11 +50,15 @@ def get_order_api(order_id):
 
 @app.route('/api/orders/<string:order_id>/status', methods=['PUT'])
 def update_order_status_api(order_id):
-    data = request.get_json()
+    data, error = get_json_body(["new_status"])
+    if error:
+        return error
     try:
         updated_order = order_tracker.update_order_status(order_id, data["new_status"])
-    except ValueError as e:
+    except OrderNotFoundError as e:
         return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     return jsonify(updated_order), 200
 
 @app.route('/api/orders', methods=['GET'])

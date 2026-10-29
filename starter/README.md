@@ -85,9 +85,31 @@ the integration tests fail, and implemented the endpoints in `app.py` until they
 - Configuring the mock (the `return_value` of `get_order` and `get_all_orders`) to simulate
   each scenario requires thinking about the storage state before writing the test.
 
+### Changes After Review
+
+The project review pointed out two robustness gaps in the API. I fixed both with the same
+Red → Green cycle: first new tests that failed, then the code to make them pass.
+
+- **Malformed request bodies returned 500.** The POST and PUT routes indexed the JSON body
+  directly, so a missing `order_id` or `new_status` raised a `KeyError`, and a non-JSON body
+  failed as well. Both routes now validate the body first and respond with a `400` that names
+  the missing fields.
+- **Invalid statuses were accepted, and every error became a 404.** `OrderTracker` now only
+  accepts the statuses the frontend offers (`pending`, `processing`, `shipped`) and raises a
+  `ValueError` for any other value, both in `add_order` and in `update_order_status`. A missing
+  order raises `OrderNotFoundError`, a subclass of `ValueError`, so the PUT route can tell the
+  two apart: missing order → `404`, invalid status → `400`.
+
+The new unit tests live in `tests/test_order_tracker.py`. The new API tests live in
+`tests/test_api_validation.py`, so the provided `tests/test_api.py` stays untouched.
+
+This review taught me that TDD only drives the cases you think of when you write the tests. My
+first suite covered the happy paths and the obvious business errors, but not what happens when
+a client sends bad input to the HTTP layer.
+
 ### What I Would Improve
 
-- Validate inputs in `add_order` (positive quantity, required fields) and in the API (missing
-  or incomplete JSON body), writing the corresponding tests first.
-- Restrict statuses to a valid set (`pending`, `processing`, `shipped`, the ones the frontend offers).
+- Validate the values of the fields in `add_order` (for example, a positive integer quantity),
+  not only their presence.
+- Return `409 Conflict` instead of `400` for duplicate order IDs.
 - Add unit tests for `InMemoryStorage`.
